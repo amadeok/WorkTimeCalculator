@@ -5,13 +5,25 @@ time_working = 0
 start_time = time.time()
 window_name = "Studio One"
 
-from datetime import date
-import datetime
+import pytz
+from datetime import timezone
+import datetime as dt
 
-today = date.today()
+datetime_rome = dt.datetime.now(pytz.timezone('Europe/Rome'))
+#print("date: ",  datetime_rome.date(), " hour ", datetime_rome.hour,":",  datetime_rome.minute,":",  datetime_rome.second)
+string_i_want= datetime_rome.strftime("%H:%M:%S")
+
+print(datetime_rome)
+today = datetime_rome.date()
 print("Today's date:", today)
 s = str(today)
+loop_time = 0.5
 
+filename = f"{today}.csv"
+if not os.path.isfile(filename):
+    f = open(filename, "w+")
+    f.close()
+    
 count =  0
 
 def read_file(get_time_working, write_to_file=True):
@@ -30,12 +42,14 @@ def read_file(get_time_working, write_to_file=True):
         line_splitted = line.split("|")
         if s in line_splitted[0]:
             if get_time_working:
-                time_working = int(line_splitted[2])
+                time_working = float(line_splitted[2].replace("\n", ""))
             todays_line = n
             today_registered = False
             break
-        
-    todays_updated = f"{str(today)} | {datetime.timedelta(seconds=time_working)} | {time_working}\n"
+
+    time_working = 0 if today_registered else time_working
+    
+    todays_updated = f"{str(today)} | {dt.timedelta(seconds=time_working)} | {time_working}\n"
     if not today_registered:
         data[todays_line] = todays_updated
     else:
@@ -51,34 +65,73 @@ def read_file(get_time_working, write_to_file=True):
 
         f.close()
 
+def write_for_visualizer( new_str ):
+    f = open(filename, "a")
+    f.write(new_str)
+    f.close()
+
+
 def update_file():
     global count
-    count+=1
-    if count % 10 == 0:
+
+    count += loop_time
+    if count % 10  == 0:
         read_file(False)
         print("updating file ", count)
 
 
-read_file(True, write_to_file=False)
-
-while 1:
-    h = w.GetForegroundWindow()
-    if window_name in w.GetWindowText(h):
-        time_working+=1
-        print("| ", f"{str(today)} | {datetime.timedelta(seconds=time_working)} | ",  w.GetWindowText (h))
-        update_file()
+def is_win_in_fore(fore_win):
+    if window_name in w.GetWindowText(fore_win):
+        return fore_win
     else:
-        try:
-            h2 = w.GetParent(h)
+        try:  
+            h2 = w.GetParent(fore_win)
+            if window_name in w.GetWindowText(h2):
+                return h2
         except Exception as e:
             print(e) 
-        if window_name in w.GetWindowText(h2):
-            time_working+=1
-            print("| ", f"{str(today)} | {datetime.timedelta(seconds=time_working)} | ",  w.GetWindowText (h2))
-            update_file()
 
-    #read_file(False)
 
-    #print(w.GetWindowText (h2))
 
-    time.sleep(1)
+    return None
+
+read_file(True, write_to_file=False)
+
+start_time = time.time()
+end_time = start_time
+foreground_change = False
+
+fore_win = w.GetForegroundWindow()
+prev_fore_win = fore_win
+
+def get_seconds(time_str):
+    hh, mm, ss = time_str.split(':')
+    return int(hh) * 3600 + int(mm) * 60 + int(ss)
+
+while 1:
+    prev_fore_win = fore_win
+    fore_win = w.GetForegroundWindow()
+
+    win = is_win_in_fore(fore_win)
+    if win:
+        time_working+=loop_time
+        print("| ", f"{str(today)} | {dt.timedelta(seconds=time_working)} | ",  w.GetWindowText (win))
+        update_file()
+    
+    if prev_fore_win != fore_win:
+        if window_name in w.GetWindowText(fore_win):
+            start_time = dt.datetime.now(pytz.timezone('Europe/Rome'))
+            print("START")
+
+        elif window_name in w.GetWindowText(prev_fore_win) and not window_name in w.GetWindowText(fore_win):
+            print("END")
+            end_time =  dt.datetime.now(pytz.timezone('Europe/Rome'))
+            st = start_time.strftime("%H:%M:%S")
+            et = end_time.strftime("%H:%M:%S")
+            new_str = f"{st}|{et}," #17:38:31|1$18:00:31|0,
+            write_for_visualizer(new_str)
+
+    #current_time = dt.datetime.now().strftime("%H:%M:%S")
+    #print("Current Time =", current_time)
+
+    time.sleep(loop_time)
