@@ -5,6 +5,7 @@ from datetime import date
 import datetime as dt
 Names = []
 Values = []
+
 today = date.today()
 print("Today's date:", today)
 s = str(today)

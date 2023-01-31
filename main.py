@@ -1,137 +1,243 @@
-import win32gui
-w=win32gui
-import time, os
-time_working = 0
-start_time = time.time()
-window_name = "Studio One"
+import win32gui, pyautogui, threading,msvcrt
+import time, os, sys
+
+
+from playsound import playsound
+from dateutil import tz
 
 import pytz
 from datetime import timezone
 import datetime as dt
 
-datetime_rome = dt.datetime.now(pytz.timezone('Europe/Rome'))
-#print("date: ",  datetime_rome.date(), " hour ", datetime_rome.hour,":",  datetime_rome.minute,":",  datetime_rome.second)
-string_i_want= datetime_rome.strftime("%H:%M:%S")
+class main:
+    def __init__(self) -> None:
+        self.w=win32gui
+        self.time_working = 0
+        self.time_working_precise = 0
+        self.start_time = time.time()
+        self.window_names = ["Studio One", "- Chromium" ]
+        self.today = None
+        self.midnight_time = None
 
-print(datetime_rome)
-today = datetime_rome.date()
-print("Today's date:", today)
-s = str(today)
-loop_time = 0.5
+        self.datetime_rome = self.get_today()
+        print(self.datetime_rome)
+        print("Today's date:", self.today)
+        print("Midnight time: ", str(self.midnight_time))
+        self.test = False
+        self.count =  0
+        self.end_time = self.start_time
+        self.foreground_change = False
+        self.loop_time = 1
 
-filename = f"{today}.csv"
-if not os.path.isfile(filename):
-    f = open(filename, "w+")
-    f.close()
-    
-count =  0
+        self.fore_win = self.w.GetForegroundWindow()
+        self.prev_fore_win = self.fore_win
+        self.bWorking = False
+            
+    def get_today(self):
+        NYC = pytz.timezone('Europe/Rome')
 
-def read_file(get_time_working, write_to_file=True):
-    todays_line = 0
-    global time_working
-    if not os.path.isfile("records.txt"):
-        f = open("records.txt", "w+")
+        self.datetime_rome =  dt.datetime.now(NYC)
+        self.today = self.datetime_rome.date()
+        self.str_today = str(self.today)
+        self.midnight_time = NYC.localize(dt.datetime.combine(self.datetime_rome, dt.time(hour=23, minute=59, second=57)))
+
+        return self.datetime_rome
+
+        
+    def read_file(self, get_time_working, write_to_file=True):
+        todays_line = 0
+
+        self.datetime_rome = self.get_today()
+
+        if not os.path.isfile("records.txt"):
+            f = open("records.txt", "w+")
+            f.close()
+
+        f = open("records.txt", "r")
+        data = f.readlines()
+
+        today_registered = True
+
+        for n, line in enumerate(data):
+            line_splitted = line.split("|")
+            if self.str_today in line_splitted[0]:
+                if get_time_working:
+                    self.time_working = float(line_splitted[2].replace("\n", ""))
+                    self.time_working_precise = float(line_splitted[3].replace("\n", ""))
+                todays_line = n
+                today_registered = False
+                break
+
+        #self.time_working = 0 if today_registered else self.time_working
+        #self.time_working_precise = 0 if today_registered else self.time_working_precise
+
+        todays_updated = f"{str(self.today)} | {dt.timedelta(seconds=self.time_working)} | {self.time_working} | {self.time_working_precise}\n"
+        if not today_registered:
+            data[todays_line] = todays_updated
+        else:
+            data.append(todays_updated)
+
         f.close()
 
-    f = open("records.txt", "r")
-    data = f.readlines()
+        if write_to_file:
+            f = open("records.txt", "w")
+            for line_ in data:
+                if line_ != "\n":
+                    if line_[-1] != "\n":
+                        line_ += "\n"
+                    f.write(line_)
 
-    today_registered = True
+            f.close()
 
-    for n, line in enumerate(data):
-        line_splitted = line.split("|")
-        if s in line_splitted[0]:
-            if get_time_working:
-                time_working = float(line_splitted[2].replace("\n", ""))
-            todays_line = n
-            today_registered = False
-            break
+    def write_for_visualizer(self, new_str ):
+        self.datetime_rome = self.get_today()
 
-    time_working = 0 if today_registered else time_working
-    
-    todays_updated = f"{str(today)} | {dt.timedelta(seconds=time_working)} | {time_working}\n"
-    if not today_registered:
-        data[todays_line] = todays_updated
-    else:
-        data.append(todays_updated)
+        filename = f"{self.today}.csv"
+        if not os.path.isfile(filename):
+            f = open(filename, "w+")
+            f.close()
 
-    f.close()
-
-    if write_to_file:
-        f = open("records.txt", "w")
-        for line_ in data:
-            if line != "\n":
-                f.write(line_)
-
+        f = open(filename, "a")
+        f.write(new_str)
         f.close()
 
-def write_for_visualizer( new_str ):
-    f = open(filename, "a")
-    f.write(new_str)
-    f.close()
+
+    def update_file(self, ):
+
+        self.count += self.loop_time
+        if self.count % 10  == 0:
+            self.read_file(False)
+            print("updating file ", self.count)
+
+    def are_any_in_fore(self, handle):
+        for win in self.window_names:
+            if win in self.w.GetWindowText(handle):
+                return True
+        return False
+
+    def is_win_in_fore(self, fore_win):
+        
+        if self.are_any_in_fore(fore_win):
+            return fore_win
+        else:
+            try:
+                if fore_win != 0:  
+                    h2 = self.w.GetParent(fore_win)
+                    if self.are_any_in_fore(h2):
+                        return h2
+            except Exception as e:
+                try: 
+                    print(e, self.w.GetWindowText(fore_win)) 
+                except Exception as e2:
+                    print(e, "  ||||||||||   \n", e2)
+        return None
+        
 
 
-def update_file():
-    global count
+    def get_seconds(self, time_str):
+        hh, mm, ss = time_str.split(':')
+        return int(hh) * 3600 + int(mm) * 60 + int(ss)
 
-    count += loop_time
-    if count % 10  == 0:
-        read_file(False)
-        print("updating file ", count)
+    def end_events(self, prev_fore_win, fore_win):
+
+        end_time =  dt.datetime.now(pytz.timezone('Europe/Rome'))
+        st = self.start_time.strftime("%H:%M:%S")
+        et = end_time.strftime("%H:%M:%S")
+        print("**END. start: ", st, " end ", et, "\n**prev:",self.w.GetWindowText(prev_fore_win) ,  " cur: ", self.w.GetWindowText(fore_win))
+
+        new_str = f"{st}|{et}," #17:38:31|1$18:00:31|0,
+        self.write_for_visualizer(new_str)
+        delta = (end_time - self.start_time)
+        self.time_working_precise += delta.total_seconds()
+        self.read_file(False)
+        print("updating file ", self.count)
+        self.count = 0
+        self.bWorking = False
+
+    def start_events(self, prev_fore_win, fore_win):
+        if self.is_win_in_fore(fore_win) and self.is_win_in_fore(prev_fore_win):
+            pass
+        elif not self.bWorking:
+            self.start_time = dt.datetime.now(pytz.timezone('Europe/Rome'))
+            print("START ", str(self.start_time))
+            if self.bWorking:
+                print("ERROR DOUBLE START || curr ", self.w.GetWindowText (fore_win), " || prev ", self.prev_fore_text)
+                playsound("b0.mp3")
+                #pyautogui.alert('ERROR DOUBLE START')
+                
+            self.bWorking = True
+
+    def main_loop(self):
+        while 1:
+            self.prev_fore_win = self.fore_win
+            self.fore_win = self.w.GetForegroundWindow()
+            self.prev_fore_text = self.w.GetWindowText(self.prev_fore_win)
+            #prev_fore_parent_text = self.w.GetWindowText(self.w.GetParent(self.prev_fore_win))
+            # print(self.w.GetWindowText(fore_win))
+            # time.sleep(0.5)
+            # continue
+            prev_today = self.today
+            self.datetime_rome = self.get_today()
+            now = dt.datetime.now(pytz.timezone('Europe/Rome'))
+
+            delta = (self.midnight_time - now).total_seconds()
+            #print("delta ", delta, str(self.midnight_time), " ", str(now))
+
+            if abs(delta) < 2 or self.test:
+                print("NEW DAY, delta: ", delta) #str(prev_today), " today: ", str(self.today)
+                if self.bWorking:
+                    self.end_events(self.prev_fore_win, self.fore_win)
+
+                    print("sleeping 7 seconds")
+                    time.sleep(7)
+
+                    self.start_time = dt.datetime.now(pytz.timezone('Europe/Rome'))
+                    print("START ", str(self.start_time))
+                    self.time_working_precise = 0
+                    self.time_working = 0
+
+                    self.bWorking = True
+                    self.test = False
+                    continue
+
+            win = self.is_win_in_fore(self.fore_win)
+            if win:
+                self.time_working += self.loop_time
+                print("| ", f"{str(self.today)} | {dt.timedelta(seconds=self.time_working)} | ",  self.w.GetWindowText (win))
+                self.update_file()
+            
+            if self.prev_fore_win != self.fore_win:
+                if self.is_win_in_fore(self.fore_win):
+                    self.start_events(self.prev_fore_win, self.fore_win)
+
+                elif self.is_win_in_fore(self.prev_fore_win) and not self.is_win_in_fore(self.fore_win):
+                    self.end_events(self.prev_fore_win, self.fore_win)
+
+            time.sleep(self.loop_time)
+
+def check_key_presses(m):
+    x = 0
+    global test
+    while 1:  # ESC
+        x = msvcrt.getch().decode('UTF-8')
+        if x == 'q':
+            sys.exit()
+        elif x == 't': 
+            time.sleep(7)
+            print("TESTING")
+            m.test = True
+            m.bWorking = True
+
+m = main()
+
+thread = threading.Thread(target=check_key_presses, args=(m, ))
+thread.start()
+
+m.read_file(True, write_to_file=False)
+m.main_loop()
 
 
-def is_win_in_fore(fore_win):
-    if window_name in w.GetWindowText(fore_win):
-        return fore_win
-    else:
-        try:  
-            h2 = w.GetParent(fore_win)
-            if window_name in w.GetWindowText(h2):
-                return h2
-        except Exception as e:
-            print(e) 
+
+  
 
 
-
-    return None
-
-read_file(True, write_to_file=False)
-
-start_time = time.time()
-end_time = start_time
-foreground_change = False
-
-fore_win = w.GetForegroundWindow()
-prev_fore_win = fore_win
-
-def get_seconds(time_str):
-    hh, mm, ss = time_str.split(':')
-    return int(hh) * 3600 + int(mm) * 60 + int(ss)
-
-while 1:
-    prev_fore_win = fore_win
-    fore_win = w.GetForegroundWindow()
-
-    win = is_win_in_fore(fore_win)
-    if win:
-        time_working+=loop_time
-        print("| ", f"{str(today)} | {dt.timedelta(seconds=time_working)} | ",  w.GetWindowText (win))
-        update_file()
-    
-    if prev_fore_win != fore_win:
-        if window_name in w.GetWindowText(fore_win):
-            start_time = dt.datetime.now(pytz.timezone('Europe/Rome'))
-            print("START")
-
-        elif window_name in w.GetWindowText(prev_fore_win) and not window_name in w.GetWindowText(fore_win):
-            print("END")
-            end_time =  dt.datetime.now(pytz.timezone('Europe/Rome'))
-            st = start_time.strftime("%H:%M:%S")
-            et = end_time.strftime("%H:%M:%S")
-            new_str = f"{st}|{et}," #17:38:31|1$18:00:31|0,
-            write_for_visualizer(new_str)
-
-    #current_time = dt.datetime.now().strftime("%H:%M:%S")
-    #print("Current Time =", current_time)
-
-    time.sleep(loop_time)

@@ -13,8 +13,12 @@ today = datetime_rome.date()
 s = str(today)
 n = len(sys.argv)
 filename = ""
+
 if n > 1:
-    filename = sys.argv[1]
+    if sys.argv[1] == "yesterday":
+        filename = f"{today - dt.timedelta(1)}.csv"
+    else:
+        filename = sys.argv[1]
 else:
     filename =  f"{today}.csv"
 
@@ -43,16 +47,28 @@ values2 = []
 #                 hms = dt.timedelta(seconds=secs)
 #                 values2.append([secs, sp[1]])
 x = 0
-
+delta =  0
+min_val = 0
 with open(filename,'r') as file:
     data = file.read()
     for seg in data.split(","):
-        if not len(seg):
+        if not len(seg) or seg == "\n":
             continue
         sp = seg.split("|")
-        for y in range(get_seconds(sp[0])//seconds_divisor, get_seconds(sp[1])//seconds_divisor):
+        st = get_seconds(sp[0])
+        et = get_seconds(sp[1])
+        if min_val < et:
+            min_val = et
+        if (et >= min_val) or 1:
+            delta += (et-st)
+        else:
+            v = 0
+        for y in range(st//seconds_divisor, et//seconds_divisor):
             counts[y] = 1
+        if delta < 0:
+            pass
 
+print("total time: ", delta, " ", dt.timedelta(seconds=delta))
 # while x < len(values2):
 #     for y in range(values2[x][0], values2[x+1][0]):
 #         counts[y] = 1
