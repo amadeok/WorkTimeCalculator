@@ -1,4 +1,4 @@
-import win32gui, pyautogui, threading,msvcrt
+import win32gui, pyautogui, threading,msvcrt, win32process, psutil
 import time, os, sys
 
 
@@ -8,14 +8,26 @@ from dateutil import tz
 import pytz
 from datetime import timezone
 import datetime as dt
+from enum import Enum
+
+# class syntax
+class Rec_type():
+    BY_WIN_NAME = 1
+    BY_PATH = 2
+
+class entry():
+    def __init__(self, window_name, rec_tpye) -> None:
+        self.window_name = window_name
+        self.rec_type = rec_tpye
 
 class main:
     def __init__(self) -> None:
+
         self.w=win32gui
         self.time_working = 0
         self.time_working_precise = 0
         self.start_time = time.time()
-        self.window_names = ["Studio One", "- Chromium" ]
+        self.window_names = [entry("Studio One", Rec_type.BY_WIN_NAME), entry("Chrome SxS", Rec_type.BY_PATH), entry("MidiEditor -", Rec_type.BY_WIN_NAME) ]
         self.today = None
         self.midnight_time = None
 
@@ -32,7 +44,25 @@ class main:
         self.fore_win = self.w.GetForegroundWindow()
         self.prev_fore_win = self.fore_win
         self.bWorking = False
+
+        # while 1:
+        #     self.fore_win = self.w.GetForegroundWindow()
+        #     if self.fore_win != 0:
+        #         threadid,pid = win32process.GetWindowThreadProcessId(self.fore_win)
+        #         print(self.w.GetWindowText(self.fore_win), " ", pid, " ", psutil.Process(pid).exe() ) 
+        #     time.sleep(1)
             
+    def get_path_from_hwd(self, hwd):
+        try:
+            if hwd != 0:
+                threadid,pid = win32process.GetWindowThreadProcessId(hwd)
+                return psutil.Process(pid).exe() 
+                #print(self.w.GetWindowText(self.fore_win), " ", pid, " ", psutil.Process(pid).exe() ) 
+            else:
+                return ""
+        except: 
+            return ""
+
     def get_today(self):
         NYC = pytz.timezone('Europe/Rome')
 
@@ -92,7 +122,11 @@ class main:
     def write_for_visualizer(self, new_str ):
         self.datetime_rome = self.get_today()
 
-        filename = f"{self.today}.csv"
+        if not os.path.isdir("vis"):
+            os.mkdir("vis")
+
+
+        filename = f"vis//{self.today}.csv"
         if not os.path.isfile(filename):
             f = open(filename, "w+")
             f.close()
@@ -110,8 +144,15 @@ class main:
             print("updating file ", self.count)
 
     def are_any_in_fore(self, handle):
-        for win in self.window_names:
-            if win in self.w.GetWindowText(handle):
+        text_to_search = ""
+        for entry in self.window_names:
+
+            if entry.rec_type == Rec_type.BY_WIN_NAME:
+                text_to_search = self.w.GetWindowText(handle)
+            else:
+                text_to_search = self.get_path_from_hwd(handle)
+
+            if entry.window_name in text_to_search:
                 return True
         return False
 

@@ -16,11 +16,11 @@ filename = ""
 
 if n > 1:
     if sys.argv[1] == "yesterday":
-        filename = f"{today - dt.timedelta(1)}.csv"
+        filename = f"vis//{today - dt.timedelta(1)}.csv"
     else:
         filename = sys.argv[1]
 else:
-    filename =  f"{today}.csv"
+    filename =  f"vis//{today}.csv"
 
 seconds_divisor = 10
 # Generate a series of dates (these are in matplotlib's internal date format)
