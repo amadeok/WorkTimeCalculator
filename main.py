@@ -26,8 +26,12 @@ class main:
         self.w=win32gui
         self.time_working = 0
         self.time_working_precise = 0
-        self.start_time = time.time()
+        self.start_time = dt.datetime.now(pytz.timezone('Europe/Rome'))
         self.window_names = [entry("Studio One", Rec_type.BY_WIN_NAME), entry("Chrome SxS", Rec_type.BY_PATH), entry("MidiEditor -", Rec_type.BY_WIN_NAME) ]
+        self.window_names.append(entry("MuseScore 3:", Rec_type.BY_WIN_NAME))
+        self.window_names.append(entry("- Midi Sheet Music", Rec_type.BY_WIN_NAME))
+        self.window_names.append(entry("Resolve.exe", Rec_type.BY_PATH))
+
         self.today = None
         self.midnight_time = None
 
